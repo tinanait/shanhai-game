@@ -1,29 +1,50 @@
 import * as THREE from 'three'
+import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js'
 import { gameState } from './gameState.js'
 
 export function createPlayer(scene, spawnPoint, collisionSystem = null) {
   const group = new THREE.Group()
 
-  // 身体：米白色斗篷（头身比 1:4，总高约 1.2，身体 0.9）
-  const bodyGeo = new THREE.CapsuleGeometry(0.3, 0.6, 4, 8)
-  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xf5f0e6 })
-  const body = new THREE.Mesh(bodyGeo, bodyMat)
-  body.position.y = 0.3
-  body.castShadow = true
-  group.add(body)
-
-  // 头部：浅棕短发
-  const headGeo = new THREE.SphereGeometry(0.25, 8, 6)
-  const headMat = new THREE.MeshLambertMaterial({ color: 0xc9a98a })
-  const head = new THREE.Mesh(headGeo, headMat)
-  head.position.y = 1.05
-  head.castShadow = true
-  group.add(head)
+  const placeholderGeo = new THREE.CapsuleGeometry(0.3, 0.6, 4, 8)
+  const placeholderMat = new THREE.MeshLambertMaterial({ color: 0xf5f0e6, transparent: true, opacity: 0.5 })
+  const placeholder = new THREE.Mesh(placeholderGeo, placeholderMat)
+  placeholder.position.y = 0.8
+  placeholder.castShadow = true
+  group.add(placeholder)
 
   // 极淡草木微光（绿色 PointLight）
   const glow = new THREE.PointLight(0x44ff88, 0.3, 3)
-  glow.position.y = 1.3
+  glow.position.y = 0.8
   group.add(glow)
+
+  const loader = new ThreeMFLoader()
+  loader.load('/assets/Shanhai_Aicao.3mf', (object3D) => {
+    group.remove(placeholder)
+
+    // 3MF 坐标系：Z 朝上；旋转 -90° 绕 X 轴使 Z→Y（直立）
+    object3D.rotation.x = -Math.PI / 2
+
+    // 缩放：模型 Z 范围 100mm → 1.6 游戏单位
+    const scale = 1.6 / 100
+    object3D.scale.setScalar(scale)
+
+    // 垂直偏移：旋转后底部在 y=-0.8，上移使脚底落在 y=0
+    object3D.position.y = 0.8
+
+    object3D.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true
+        child.material = new THREE.MeshLambertMaterial({ color: 0xf0ece0 })
+        child.material.transparent = true
+        child.material.opacity = 1
+      }
+    })
+
+    group.add(object3D)
+    console.log('[player] 艾草模型加载完成')
+  }, undefined, (err) => {
+    console.warn('[player] 3MF 加载失败，保留占位体', err)
+  })
 
   // 放置到出生点
   group.position.copy(spawnPoint)
